@@ -144,18 +144,17 @@ class MAIN:
 		self.snake.reset()
 
 	def draw_grass(self):
-		grass_color = (167,209,61)
+		grass_image_1 = pygame.image.load("Graphics/grass1.png").convert()
+		grass_image_2 = pygame.image.load("Graphics/grass2.png").convert()
+
+		grass_image_1 = pygame.transform.scale(grass_image_1, (cell_size, cell_size))
+		grass_image_2 = pygame.transform.scale(grass_image_2, (cell_size, cell_size))
+	
 		for row in range(cell_number):
-			if row % 2 == 0: 
-				for col in range(cell_number):
-					if col % 2 == 0:
-						grass_rect = pygame.Rect(col * cell_size,row * cell_size,cell_size,cell_size)
-						pygame.draw.rect(screen,grass_color,grass_rect)
-			else:
-				for col in range(cell_number):
-					if col % 2 != 0:
-						grass_rect = pygame.Rect(col * cell_size,row * cell_size,cell_size,cell_size)
-						pygame.draw.rect(screen,grass_color,grass_rect)			
+			for col in range(cell_number):
+				grass_image = grass_image_1 if (row + col) % 2 == 0 else grass_image_2
+				screen.blit(grass_image, (col * cell_size, row * cell_size))
+	
 
 	def draw_score(self):
 		score_text = str(len(self.snake.body) - 3)
