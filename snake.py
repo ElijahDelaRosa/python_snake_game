@@ -1,11 +1,39 @@
-import pygame,sys,random
+import pygame,sys,random, time
 from pygame.math import Vector2
+from PIL import Image, ImageSequence
+from typing import List, Tuple, Optional
+
+class Button:
+    def __init__(self, x: int, y: int, width: int, height: int, text: str, font: pygame.font.Font, 
+                 color: Tuple[int, int, int], hover_color: Tuple[int, int, int]):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.font = font
+        self.color = color
+        self.hover_color = hover_color
+        self.is_hovered = False
+        self.text_surf = self.font.render(text, True, (255, 255, 255))
+        self.text_rect = self.text_surf.get_rect(center=self.rect.center)
+        
+    def draw(self, screen: pygame.Surface):
+        color = self.hover_color if self.is_hovered else self.color
+        pygame.draw.rect(screen, color, self.rect, border_radius=12)
+        pygame.draw.rect(screen, (255, 255, 255), self.rect, 3, border_radius=12)
+        screen.blit(self.text_surf, self.text_rect)
+        
+    def check_hover(self, mouse_pos: Tuple[int, int]) -> bool:
+        self.is_hovered = self.rect.collidepoint(mouse_pos)
+        return self.is_hovered
+    
+    def is_clicked(self, mouse_pos: Tuple[int, int], mouse_clicked: bool) -> bool:
+        return self.rect.collidepoint(mouse_pos) and mouse_clicked
 
 class SNAKE:
-	def __init__(self):
+	def __init__(self, cell_size: int):
 		self.body = [Vector2(5,10),Vector2(4,10),Vector2(3,10)]
 		self.direction = Vector2(0,0)
 		self.new_block = False
+		self.cell_size = cell_size
 
 		self.head_up = pygame.image.load('Graphics/head_up.png').convert_alpha()
 		self.head_down = pygame.image.load('Graphics/head_down.png').convert_alpha()
@@ -24,9 +52,13 @@ class SNAKE:
 		self.body_tl = pygame.image.load('Graphics/body_tl.png').convert_alpha()
 		self.body_br = pygame.image.load('Graphics/body_br.png').convert_alpha()
 		self.body_bl = pygame.image.load('Graphics/body_bl.png').convert_alpha()
+
 		self.crunch_sound = pygame.mixer.Sound('Sound/crunch.wav')
 
-	def draw_snake(self):
+		self.head = self.head_right
+		self.tail = self.tail_left
+
+	def draw_snake(self, screen: pygame.Surface, cell_size: int):
 		self.update_head_graphics()
 		self.update_tail_graphics()
 
@@ -93,119 +125,290 @@ class SNAKE:
 
 
 class FRUIT:
-	def __init__(self):
+	def __init__(self, cell_number: int):
+		self.cell_number = cell_number
+		self.pos = Vector2(0, 0)
 		self.randomize()
 
-	def draw_fruit(self):
+	def draw_fruit(self, screen: pygame.Surface, cell_size: int, apple: pygame.Surface):
 		fruit_rect = pygame.Rect(int(self.pos.x * cell_size),int(self.pos.y * cell_size),cell_size,cell_size)
 		screen.blit(apple,fruit_rect)
-		#pygame.draw.rect(screen,(126,166,114),fruit_rect)
 
 	def randomize(self):
-		self.x = random.randint(0,cell_number - 1)
-		self.y = random.randint(0,cell_number - 1)
+		self.x = random.randint(0,self.cell_number - 1)
+		self.y = random.randint(0,self.cell_number - 1)
 		self.pos = Vector2(self.x,self.y)
 
 class MAIN:
-	def __init__(self):
-		self.snake = SNAKE()
-		self.fruit = FRUIT()
+	DIFFICULTY = {
+        "Easy": 200,
+        "Medium": 150,
+        "Hard": 100
+    }
+
+	def __init__(self, screen: pygame.Surface, cell_size: int, cell_number: int, 
+                 game_font: pygame.font.Font, apple: pygame.Surface, clock: pygame.time.Clock):
+		self.screen = screen
+		self.cell_size = cell_size
+		self.cell_number = cell_number
+		self.game_font = game_font
+		self.apple = apple
+		self.clock = clock
+		self.snake = SNAKE(cell_size)
+		self.fruit = FRUIT(cell_number)
+		self.score = 0
+		self.game_active = False
+		self.difficulty = "Medium"
+		self.game_speed = self.DIFFICULTY[self.difficulty]
+
+		self.grass_image_1 = pygame.image.load("Graphics/grass1.png").convert()
+		self.grass_image_2 = pygame.image.load("Graphics/grass2.png").convert()
+		self.grass_image_1 = pygame.transform.scale(self.grass_image_1, (cell_size, cell_size))
+		self.grass_image_2 = pygame.transform.scale(self.grass_image_2, (cell_size, cell_size))
+
+		background = Image.open("Graphics/main_menu_bg.gif")
+
+		self.frames = [
+			pygame.image.fromstring(frame.convert("RGBA").tobytes(), frame.size, "RGBA") 
+			for frame in ImageSequence.Iterator(background)
+		]
+
+		self.scaled_frames = [
+			pygame.transform.scale(frame, (cell_number * cell_size, cell_number * cell_size))
+			for frame in self.frames
+		]
+
+		title_width = cell_number * cell_size
+		title_height = cell_size * 2
+		title_font = pygame.font.Font('Font/dpcomic.ttf', 50)
+
+		self.title_text = title_font.render("Snake Game", True, (255, 255, 255))
+		self.title_rect = self.title_text.get_rect(center=(title_width // 2, title_height // 2))
+
+		self.SCREEN_UPDATE = pygame.USEREVENT
+		pygame.time.set_timer(self.SCREEN_UPDATE, self.game_speed)
+
+		self.button_font = pygame.font.Font('Font/dpcomic.ttf', 30)
+
+		self.play_button = None
+		self.quit_button = None
+		self.diff_buttons = []
+		self.back_button = None
+		self.initialize_buttons()
+
+	def initialize_buttons(self):
+		button_width = 200
+		button_height = 60
+		center_x = self.cell_number * self.cell_size // 2
+        
+		self.play_button = Button(
+            center_x - button_width // 2, 
+            self.cell_number * self.cell_size // 2, 
+            button_width, button_height, "PLAY", 
+            self.button_font, (56, 74, 12), (76, 94, 32)
+        )
+        
+		self.quit_button = Button(
+            center_x - button_width // 2, 
+            self.cell_number * self.cell_size // 2 + button_height + 20, 
+            button_width, button_height, "QUIT", 
+            self.button_font, (56, 74, 12), (76, 94, 32)
+        )
+        
+        # Difficulty selection buttons
+		diff_button_width = 160
+		diff_button_height = 50
+		diff_y_start = self.cell_number * self.cell_size // 2
+        
+		self.diff_buttons = [
+            Button(
+                center_x - diff_button_width // 2,
+                diff_y_start + i * (diff_button_height + 20),
+                diff_button_width, diff_button_height, diff,
+                self.button_font, (56, 74, 12), (76, 94, 32)
+            )
+            for i, diff in enumerate(["Easy", "Medium", "Hard"])
+        ]
+        
+		self.back_button = Button(
+            center_x - diff_button_width // 2,
+            diff_y_start + 3 * (diff_button_height + 20),
+            diff_button_width, diff_button_height, "Back",
+            self.button_font, (150, 30, 30), (170, 50, 50)
+        )
 
 	def update(self):
 		self.snake.move_snake()
 		self.check_collision()
 		self.check_fail()
 
-	def draw_elements(self):
-		self.draw_grass()
-		self.fruit.draw_fruit()
-		self.snake.draw_snake()
-		self.draw_score()
+	def main_menu(self):
+		frame_index = 0
+		menu_state = "main"
+
+		while True:
+			mouse_pos = pygame.mouse.get_pos()
+			mouse_clicked = False
+
+			for event in pygame.event.get():
+				if event.type == pygame.QUIT:
+					pygame.quit()
+					sys.exit()
+				if event.type == pygame.MOUSEBUTTONDOWN:
+					if event.button == 1:
+						mouse_clicked = True
+			
+			self.screen.blit(self.scaled_frames[frame_index], (0, 0))
+
+			self.screen.blit(self.title_text, self.title_rect)
+
+			if menu_state == "main":
+				self.play_button.check_hover(mouse_pos)
+				self.quit_button.check_hover(mouse_pos)
+
+				self.play_button.draw(self.screen)
+				self.quit_button.draw(self.screen)
+
+				if self.play_button.is_clicked(mouse_pos, mouse_clicked):
+					menu_state = "difficulty"
+				elif self.quit_button.is_clicked(mouse_pos, mouse_clicked):
+					pygame.quit()
+					sys.exit()
+			
+			elif menu_state == "difficulty":
+				diff_text = self.button_font.render("SELECT DIFFICULTY", True, (255, 255, 255))
+				diff_rect = diff_text.get_rect(center=(self.cell_number * self.cell_size // 2, 
+                                                      self.cell_number * self.cell_size // 3))
+				self.screen.blit(diff_text, diff_rect)
+                
+				for button in self.diff_buttons:
+					button.check_hover(mouse_pos)
+					button.draw(self.screen)
+                    
+					if button.is_clicked(mouse_pos, mouse_clicked):
+						self.difficulty = button.text
+						self.game_speed = self.DIFFICULTY[self.difficulty]
+						pygame.time.set_timer(self.SCREEN_UPDATE, self.game_speed)
+						self.game_active = True
+						self.snake.direction = Vector2(1, 0)
+						return
+                
+				self.back_button.check_hover(mouse_pos)
+				self.back_button.draw(self.screen)
+                
+				if self.back_button.is_clicked(mouse_pos, mouse_clicked):
+					menu_state = "main"
+            
+			frame_index = (frame_index + 1) % len(self.frames)
+
+			pygame.display.update()
+			self.clock.tick(10)
 
 	def check_collision(self):
 		if self.fruit.pos == self.snake.body[0]:
 			self.fruit.randomize()
+			while any(block == self.fruit.pos for block in self.snake.body):
+				self.fruit.randomize()
 			self.snake.add_block()
 			self.snake.play_crunch_sound()
-
-		for block in self.snake.body[1:]:
-			if block == self.fruit.pos:
+			self.score += 1
+            
+			while any(block == self.fruit.pos for block in self.snake.body):
 				self.fruit.randomize()
 
 	def check_fail(self):
-		if not 0 <= self.snake.body[0].x < cell_number or not 0 <= self.snake.body[0].y < cell_number:
+		if not 0 <= self.snake.body[0].x < self.cell_number or not 0 <= self.snake.body[0].y < self.cell_number:
+			print("Hit wall")
 			self.game_over()
 
 		for block in self.snake.body[1:]:
 			if block == self.snake.body[0]:
+				print("Hit self")
 				self.game_over()
 		
 	def game_over(self):
 		self.snake.reset()
-
-	def draw_grass(self):
-		grass_image_1 = pygame.image.load("Graphics/grass1.png").convert()
-		grass_image_2 = pygame.image.load("Graphics/grass2.png").convert()
-
-		grass_image_1 = pygame.transform.scale(grass_image_1, (cell_size, cell_size))
-		grass_image_2 = pygame.transform.scale(grass_image_2, (cell_size, cell_size))
-	
-		for row in range(cell_number):
-			for col in range(cell_number):
-				grass_image = grass_image_1 if (row + col) % 2 == 0 else grass_image_2
-				screen.blit(grass_image, (col * cell_size, row * cell_size))
-	
+		self.score = 0
+		self.game_active = False
+		self.main_menu()
 
 	def draw_score(self):
 		score_text = str(len(self.snake.body) - 3)
-		score_surface = game_font.render(score_text,True,(56,74,12))
-		score_x = int(cell_size * cell_number - 60)
-		score_y = int(cell_size * cell_number - 40)
+		score_surface = self.game_font.render(score_text,True,(56,74,12))
+		score_x = int(self.cell_size * self.cell_number - 60)
+		score_y = int(self.cell_size * self.cell_number - 40)
 		score_rect = score_surface.get_rect(center = (score_x,score_y))
-		apple_rect = apple.get_rect(midright = (score_rect.left,score_rect.centery))
+		apple_rect = self.apple.get_rect(midright = (score_rect.left,score_rect.centery))
 		bg_rect = pygame.Rect(apple_rect.left,apple_rect.top,apple_rect.width + score_rect.width + 6,apple_rect.height)
 
-		pygame.draw.rect(screen,(167,209,61),bg_rect)
-		screen.blit(score_surface,score_rect)
-		screen.blit(apple,apple_rect)
-		pygame.draw.rect(screen,(56,74,12),bg_rect,2)
+		pygame.draw.rect(self.screen,(167,209,61),bg_rect)
+		self.screen.blit(score_surface,score_rect)
+		self.screen.blit(self.apple,apple_rect)
+		pygame.draw.rect(self.screen,(56,74,12),bg_rect,2)
 
-pygame.mixer.pre_init(44100,-16,2,512)
-pygame.init()
-cell_size = 40
-cell_number = 20
-screen = pygame.display.set_mode((cell_number * cell_size,cell_number * cell_size))
-clock = pygame.time.Clock()
-apple = pygame.image.load('Graphics/apple.png').convert_alpha()
-game_font = pygame.font.Font('Font/PoetsenOne-Regular.ttf', 25)
+	def draw_grass(self):
+		for row in range(self.cell_number):
+			for col in range(self.cell_number):
+				if (row + col) % 2 == 0:
+					grass_rect = pygame.Rect(col * self.cell_size, row * self.cell_size, self.cell_size, self.cell_size)
+					self.screen.blit(self.grass_image_1, grass_rect)
+				else:
+					grass_rect = pygame.Rect(col * self.cell_size, row * self.cell_size, self.cell_size, self.cell_size)
+					self.screen.blit(self.grass_image_2, grass_rect)
 
-SCREEN_UPDATE = pygame.USEREVENT
-pygame.time.set_timer(SCREEN_UPDATE,150)
+	def draw_elements(self):
+		self.draw_grass()
+		self.fruit.draw_fruit(self.screen, self.cell_size, self.apple)
+		self.snake.draw_snake(self.screen, self.cell_size)
+		self.draw_score()
 
-main_game = MAIN()
+def main():
+    pygame.init()
+    pygame.mixer.init()
+    
+    cell_size = 40
+    cell_number = 20
+    screen_width = cell_number * cell_size
+    screen_height = cell_number * cell_size
+    
+    screen = pygame.display.set_mode((screen_width, screen_height))
+    pygame.display.set_caption("Snake Game")
+    clock = pygame.time.Clock()
+    
+    game_font = pygame.font.Font('Font/PoetsenOne-Regular.ttf', 25)
+    apple = pygame.image.load('Graphics/apple.png').convert_alpha()
+    
+    game = MAIN(screen, cell_size, cell_number, game_font, apple, clock)
+    
+    game.main_menu()
+    
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == game.SCREEN_UPDATE and game.game_active:
+                game.update()
+            if event.type == pygame.KEYDOWN and game.game_active:
+                if event.key == pygame.K_UP and game.snake.direction.y != 1:
+                    game.snake.direction = Vector2(0, -1)
+                if event.key == pygame.K_DOWN and game.snake.direction.y != -1:
+                    game.snake.direction = Vector2(0, 1)
+                if event.key == pygame.K_LEFT and game.snake.direction.x != 1:
+                    game.snake.direction = Vector2(-1, 0)
+                if event.key == pygame.K_RIGHT and game.snake.direction.x != -1:
+                    game.snake.direction = Vector2(1, 0)
+                if event.key == pygame.K_ESCAPE:
+                    game.game_active = False
+                    game.main_menu()
+        
+        screen.fill((175, 215, 70))
+        
+        if game.game_active:
+            game.draw_elements()
+        
+        pygame.display.update()
+        clock.tick(60)
 
-while True:
-	for event in pygame.event.get():
-		if event.type == pygame.QUIT:
-			pygame.quit()
-			sys.exit()
-		if event.type == SCREEN_UPDATE:
-			main_game.update()
-		if event.type == pygame.KEYDOWN:
-			if event.key == pygame.K_UP:
-				if main_game.snake.direction.y != 1:
-					main_game.snake.direction = Vector2(0,-1)
-			if event.key == pygame.K_RIGHT:
-				if main_game.snake.direction.x != -1:
-					main_game.snake.direction = Vector2(1,0)
-			if event.key == pygame.K_DOWN:
-				if main_game.snake.direction.y != -1:
-					main_game.snake.direction = Vector2(0,1)
-			if event.key == pygame.K_LEFT:
-				if main_game.snake.direction.x != 1:
-					main_game.snake.direction = Vector2(-1,0)
-
-	screen.fill((175,215,70))
-	main_game.draw_elements()
-	pygame.display.update()
-	clock.tick(60)
+if __name__ == "__main__":
+    main()
