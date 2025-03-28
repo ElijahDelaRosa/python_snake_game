@@ -139,11 +139,68 @@ class FRUIT:
 		self.y = random.randint(0,self.cell_number - 1)
 		self.pos = Vector2(self.x,self.y)
 
+class WALL:
+    def __init__(self, cell_number: int):
+        self.cell_number = cell_number
+        self.walls: List[Vector2] = []
+
+    def generate_walls(self, min_walls: int, max_walls: int, snake_body: List[Vector2], fruit_pos: Vector2):
+        self.walls.clear()
+        
+        num_walls = random.randint(min_walls, max_walls)
+        
+        for _ in range(num_walls):
+            wall_pos = self.get_unique_position(snake_body, fruit_pos)
+            self.walls.append(wall_pos)
+
+    def get_unique_position(self, snake_body: List[Vector2], fruit_pos: Vector2) -> Vector2:
+        attempts = 0
+        max_attempts = 100  # Prevent infinite loop
+        
+        while attempts < max_attempts:
+            x = random.randint(0, self.cell_number - 1)
+            y = random.randint(0, self.cell_number - 1)
+            new_pos = Vector2(x, y)
+            
+            if (new_pos not in snake_body and 
+                new_pos != fruit_pos and 
+                new_pos not in self.walls):
+                return new_pos
+            
+            attempts += 1
+        
+        return Vector2(0, 0)
+
+    def draw_walls(self, screen: pygame.Surface, cell_size: int, wall_image: pygame.Surface):
+        for wall_pos in self.walls:
+            wall_rect = pygame.Rect(
+                int(wall_pos.x * cell_size), 
+                int(wall_pos.y * cell_size), 
+                cell_size, 
+                cell_size
+            )
+            screen.blit(wall_image, wall_rect)
+
 class MAIN:
 	DIFFICULTY = {
-        "Easy": 200,
-        "Medium": 150,
-        "Hard": 100
+        "Easy": {
+            "speed": 200,
+			"wall_count": (3, 5),
+            "wall_change_time": float('inf'),
+            "apple_poison_time": float('inf')
+        },
+        "Medium": {
+            "speed": 150,
+			"wall_count": (5, 7),
+            "wall_change_time": 10000,
+            "apple_poison_time": 10000
+        },
+        "Hard": {
+            "speed": 100,
+			"wall_count": (7, 9),
+            "wall_change_time": 5000,
+            "apple_poison_time": 5000
+        }
     }
 
 	def __init__(self, screen: pygame.Surface, cell_size: int, cell_number: int, 
@@ -159,7 +216,7 @@ class MAIN:
 		self.score = 0
 		self.game_active = False
 		self.difficulty = "Medium"
-		self.game_speed = self.DIFFICULTY[self.difficulty]
+		self.game_speed = self.DIFFICULTY[self.difficulty]["speed"]
 
 		self.grass_image_1 = pygame.image.load("Graphics/grass1.png").convert()
 		self.grass_image_2 = pygame.image.load("Graphics/grass2.png").convert()
@@ -184,6 +241,17 @@ class MAIN:
 
 		self.title_text = title_font.render("Snake Game", True, (255, 255, 255))
 		self.title_rect = self.title_text.get_rect(center=(title_width // 2, title_height // 2))
+
+		self.wall = WALL(cell_number)
+		self.wall_image = pygame.image.load('Graphics/wall.PNG').convert_alpha()
+		self.wall_image = pygame.transform.scale(self.wall_image, (cell_size, cell_size))
+
+		self.poisonous_apple_image = pygame.image.load('Graphics/poison_apple.png').convert_alpha()
+		self.poisonous_apple_image = pygame.transform.scale(self.poisonous_apple_image, (cell_size, cell_size))
+        
+		self.last_wall_change_time = pygame.time.get_ticks()
+		self.last_apple_poison_time = pygame.time.get_ticks()
+		self.apple_is_poisonous = False
 
 		self.SCREEN_UPDATE = pygame.USEREVENT
 		pygame.time.set_timer(self.SCREEN_UPDATE, self.game_speed)
@@ -215,7 +283,6 @@ class MAIN:
             self.button_font, (56, 74, 12), (76, 94, 32)
         )
         
-        # Difficulty selection buttons
 		diff_button_width = 160
 		diff_button_height = 50
 		diff_y_start = self.cell_number * self.cell_size // 2
@@ -238,6 +305,22 @@ class MAIN:
         )
 
 	def update(self):
+		current_time = pygame.time.get_ticks()
+        
+		if current_time - self.last_wall_change_time > self.DIFFICULTY[self.difficulty]["wall_change_time"]:
+			wall_range = self.DIFFICULTY[self.difficulty]["wall_count"]
+			self.wall.generate_walls(
+                wall_range[0], 
+                wall_range[1], 
+                self.snake.body, 
+                self.fruit.pos
+            )
+			self.last_wall_change_time = current_time
+        
+		if current_time - self.last_apple_poison_time > self.DIFFICULTY[self.difficulty]["apple_poison_time"]:
+			self.apple_is_poisonous = True
+			self.last_apple_poison_time = current_time
+
 		self.snake.move_snake()
 		self.check_collision()
 		self.check_fail()
@@ -287,8 +370,17 @@ class MAIN:
                     
 					if button.is_clicked(mouse_pos, mouse_clicked):
 						self.difficulty = button.text
-						self.game_speed = self.DIFFICULTY[self.difficulty]
+						self.game_speed = self.DIFFICULTY[self.difficulty]["speed"]
 						pygame.time.set_timer(self.SCREEN_UPDATE, self.game_speed)
+
+						wall_range = self.DIFFICULTY[self.difficulty]["wall_count"]
+						self.wall.generate_walls(
+							wall_range[0], 
+							wall_range[1],
+							self.snake.body, 
+							self.fruit.pos
+						)
+
 						self.game_active = True
 						self.snake.direction = Vector2(1, 0)
 						return
@@ -306,19 +398,38 @@ class MAIN:
 
 	def check_collision(self):
 		if self.fruit.pos == self.snake.body[0]:
-			self.fruit.randomize()
-			while any(block == self.fruit.pos for block in self.snake.body):
+			if self.apple_is_poisonous:
+				print("Ate poisonous apple!")
+				self.score -= 1
+				self.apple_is_poisonous = False
 				self.fruit.randomize()
+				while (any(block == self.fruit.pos for block in self.snake.body) or 
+		   			   any(block == self.fruit.pos for block in self.wall.walls)):
+					self.fruit.randomize()
+				return
+
+			self.fruit.randomize()
+			while (any(block == self.fruit.pos for block in self.snake.body) or 
+                   any(block == self.fruit.pos for block in self.wall.walls)):
+				self.fruit.randomize()
+			
 			self.snake.add_block()
 			self.snake.play_crunch_sound()
 			self.score += 1
+
+			self.apple_is_poisonous = False
+			self.last_apple_poison_time = pygame.time.get_ticks()
             
 			while any(block == self.fruit.pos for block in self.snake.body):
 				self.fruit.randomize()
 
 	def check_fail(self):
-		if not 0 <= self.snake.body[0].x < self.cell_number or not 0 <= self.snake.body[0].y < self.cell_number:
+		if self.snake.body[0] in self.wall.walls:
 			print("Hit wall")
+			self.game_over()
+
+		if not 0 <= self.snake.body[0].x < self.cell_number or not 0 <= self.snake.body[0].y < self.cell_number:
+			print("Hit edge")
 			self.game_over()
 
 		for block in self.snake.body[1:]:
@@ -358,7 +469,12 @@ class MAIN:
 
 	def draw_elements(self):
 		self.draw_grass()
-		self.fruit.draw_fruit(self.screen, self.cell_size, self.apple)
+
+		self.wall.draw_walls(self.screen, self.cell_size, self.wall_image)
+
+		current_apple = self.poisonous_apple_image if self.apple_is_poisonous else self.apple
+		self.fruit.draw_fruit(self.screen, self.cell_size, current_apple)
+
 		self.snake.draw_snake(self.screen, self.cell_size)
 		self.draw_score()
 
