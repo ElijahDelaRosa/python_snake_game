@@ -1,7 +1,157 @@
-import pygame,sys,random, time
+import pygame,sys,random, time, sqlite3
 from pygame.math import Vector2
 from PIL import Image, ImageSequence
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
+
+class PlayerDatabase:
+    def __init__(self, db_file="Database/players_names.db"):
+        self.db_file = db_file
+        self.conn = None
+        self.cursor = None
+        self.initialize_db()
+    
+    def connect(self):
+        self.conn = sqlite3.connect(self.db_file)
+        self.cursor = self.conn.cursor()
+
+    def close(self):
+        if self.conn:
+            self.conn.commit()
+            self.conn.close()
+
+    def initialize_db(self):
+        self.connect()
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS players (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                high_score INTEGER DEFAULT 0,
+                difficulty TEXT,
+                highest_level INTEGER DEFAULT 1,
+                games_played INTEGER DEFAULT 0,
+                last_played TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        self.conn.commit()
+        self.close()
+
+    def add_player(self, name: str) -> int:
+        """Add a new player or return existing player ID"""
+        self.connect()
+        self.cursor.execute("SELECT id FROM players WHERE name = ?", (name,))
+        result = self.cursor.fetchone()
+        
+        if result:
+            player_id = result[0]
+        else:
+            self.cursor.execute(
+                "INSERT INTO players (name) VALUES (?)", 
+                (name,)
+            )
+            player_id = self.cursor.lastrowid
+            
+        self.close()
+        return player_id
+    
+    def update_player_score(self, player_id: int, score: int, difficulty: str, level: int):
+        self.connect()
+        self.cursor.execute(
+            """
+            UPDATE players SET 
+            games_played = games_played + 1,
+            last_played = CURRENT_TIMESTAMP,
+            difficulty = ?,
+            highest_level = MAX(highest_level, ?),
+            high_score = MAX(high_score, ?)
+            WHERE id = ?
+            """, 
+            (difficulty, level, score, player_id)
+        )
+        self.close()
+    
+    def get_top_players(self, limit: int = 10) -> List[Dict[str, Any]]:
+        self.connect()
+        self.cursor.execute(
+            """
+            SELECT name, high_score, difficulty, highest_level 
+            FROM players 
+            ORDER BY high_score DESC 
+            LIMIT ?
+            """, 
+            (limit,)
+        )
+        
+        top_players = []
+        for row in self.cursor.fetchall():
+            top_players.append({
+                "name": row[0],
+                "high_score": row[1],
+                "difficulty": row[2],
+                "highest_level": row[3]
+            })
+            
+        self.close()
+        return top_players
+    
+class TextInput:
+    def __init__(self, x: int, y: int, width: int, height: int,
+                font: pygame.font.Font, max_chars: int = 20):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.font = font
+        self.text = ""
+        self.max_chars = max_chars
+        self.active = False
+        self.color_inactive = (100, 100, 100)
+        self.color_active = (0, 120, 215)
+        self.color = self.color_inactive
+        self.cursor_visible = True
+        self.cursor_timer = 0
+        self.blink_speed = 500  # milliseconds
+        
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self.active = self.rect.collidepoint(event.pos)
+            self.color = self.color_active if self.active else self.color_inactive
+        
+        if event.type == pygame.KEYDOWN and self.active:
+            if event.key == pygame.K_RETURN:
+                return True
+            elif event.key == pygame.K_BACKSPACE:
+                self.text = self.text[:-1]
+            elif len(self.text) < self.max_chars and event.unicode.isprintable():
+                self.text += event.unicode
+        
+        return False
+    
+    def update(self):
+        current_time = pygame.time.get_ticks()
+        if current_time - self.cursor_timer > self.blink_speed:
+            self.cursor_visible = not self.cursor_visible
+            self.cursor_timer = current_time
+            
+    def draw(self, screen):
+        # Draw background and outline
+        pygame.draw.rect(screen, (255, 255, 255), self.rect)
+        pygame.draw.rect(screen, self.color, self.rect, 2)
+        
+        # Render text
+        text_surface = self.font.render(self.text, True, (0, 0, 0))
+        
+        # Position text inside the input box
+        text_rect = text_surface.get_rect(midleft=(self.rect.x + 5, self.rect.centery))
+        screen.blit(text_surface, text_rect)
+        
+        # Draw cursor if active
+        if self.active and self.cursor_visible:
+            cursor_pos = text_rect.right
+            cursor_height = self.font.get_height()
+            pygame.draw.line(
+                screen, 
+                (0, 0, 0), 
+                (cursor_pos, text_rect.centery - cursor_height//2), 
+                (cursor_pos, text_rect.centery + cursor_height//2),
+                2
+            )
 
 class Button:
     def __init__(self, x: int, y: int, width: int, height: int, text: str, font: pygame.font.Font, 
@@ -254,6 +404,15 @@ class MAIN:
         self.level_complete_time = 0
         self.level_transition_duration = 3000
 
+        self.player_db = PlayerDatabase()
+        self.player_name = ""
+        self.player_id = None
+        self.name_input = None
+        self.input_screen_active = True
+        self.welcome_time = 0
+        self.welcome_duration = 2000
+        self.showing_welcome = False
+
         self.grass_image_1 = pygame.image.load("Graphics/grass1.png").convert()
         self.grass_image_2 = pygame.image.load("Graphics/grass2.png").convert()
         self.grass_image_1 = pygame.transform.scale(self.grass_image_1, (cell_size, cell_size))
@@ -389,6 +548,114 @@ class MAIN:
         self.check_collision()
         self.check_fail()
         self.check_level_completion()
+
+    def name_input_screen(self):
+        if not self.name_input:
+            input_width = 300
+            input_height = 50
+            center_x = self.cell_number * self.cell_size // 2
+            center_y = self.cell_number * self.cell_size // 2
+            
+            self.name_input = TextInput(
+                center_x - input_width // 2,
+                center_y - input_height // 2,
+                input_width, input_height,
+                self.button_font, 15
+            )
+            
+        frame_index = 0
+        
+        submit_button = Button(
+            self.cell_number * self.cell_size // 2 - 100,
+            self.cell_number * self.cell_size // 2 + 50,
+            200, 60, "SUBMIT",
+            self.button_font, (56, 74, 12), (76, 94, 32)
+        )
+        
+        while self.input_screen_active:
+            mouse_pos = pygame.mouse.get_pos()
+            mouse_clicked = False
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1:
+                        mouse_clicked = True
+                        
+                # Handle input box events
+                if self.name_input.handle_event(event) and self.name_input.text.strip():
+                    self.submit_player_name()
+                    
+            self.name_input.update()
+            
+            # Draw the background
+            self.screen.blit(self.scaled_frames[frame_index], (0, 0))
+            
+            # Draw title
+            title_font = pygame.font.Font('Font/dpcomic.ttf', 50)
+            title_text = title_font.render("Snake Game", True, (255, 255, 255))
+            title_rect = title_text.get_rect(center=(
+                self.cell_number * self.cell_size // 2, 
+                self.cell_number * self.cell_size // 4
+            ))
+            self.screen.blit(title_text, title_rect)
+            
+            # Draw instructions
+            inst_font = pygame.font.Font('Font/dpcomic.ttf', 30)
+            inst_text = inst_font.render("Enter Your Name:", True, (255, 255, 255))
+            inst_rect = inst_text.get_rect(center=(
+                self.cell_number * self.cell_size // 2, 
+                self.cell_number * self.cell_size // 2 - 60
+            ))
+            self.screen.blit(inst_text, inst_rect)
+            
+            # Draw input box
+            self.name_input.draw(self.screen)
+            
+            # Draw submit button
+            submit_button.check_hover(mouse_pos)
+            submit_button.draw(self.screen)
+            
+            if submit_button.is_clicked(mouse_pos, mouse_clicked) and self.name_input.text.strip():
+                self.submit_player_name()
+                
+            frame_index = (frame_index + 1) % len(self.frames)
+            pygame.display.update()
+            self.clock.tick(10)
+
+    def submit_player_name(self):
+        self.player_name = self.name_input.text.strip()
+        if self.player_name:
+            self.player_id = self.player_db.add_player(self.player_name)
+            self.input_screen_active = False
+            self.showing_welcome = True
+            self.welcome_time = pygame.time.get_ticks()
+            
+    def show_welcome_screen(self):
+        current_time = pygame.time.get_ticks()
+        if current_time - self.welcome_time > self.welcome_duration:
+            self.showing_welcome = False
+            return
+        
+        self.screen.blit(self.scaled_frames[0], (0, 0))
+            
+        # Draw welcome overlay
+        overlay = pygame.Surface((self.cell_number * self.cell_size, self.cell_number * self.cell_size))
+        overlay.set_alpha(180)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+        
+        welcome_font = pygame.font.Font('Font/dpcomic.ttf', 50)
+        welcome_text = welcome_font.render(f"Welcome, {self.player_name}!", True, (255, 255, 0))
+        welcome_rect = welcome_text.get_rect(center=(
+            self.cell_number * self.cell_size // 2,
+            self.cell_number * self.cell_size // 2
+        ))
+        self.screen.blit(welcome_text, welcome_rect)
+        
+        pygame.display.update()
 
     def main_menu(self):
         frame_index = 0
@@ -672,6 +939,15 @@ class MAIN:
         
     def game_over(self):
         self.game_over_active = True
+        
+        # Save player score to database if player exists
+        if self.player_id:
+            self.player_db.update_player_score(
+                self.player_id,
+                self.score,
+                self.difficulty,
+                self.LEVELS[self.difficulty][self.current_level_index].level_number
+            )
 
     def draw_score(self):
         score_text = str(self.score)
@@ -723,6 +999,17 @@ class MAIN:
         
         pygame.draw.rect(self.screen, (56, 74, 12), 
                         (progress_x, progress_y, progress_width, progress_height), 2)
+        
+        if self.player_name:
+            player_text = f"Player: {self.player_name}"
+            player_surface = self.game_font.render(player_text, True, (56, 74, 12))
+            player_rect = player_surface.get_rect(midleft=(20, 140))
+            player_bg_rect = pygame.Rect(player_rect.left - 5, player_rect.top - 5, 
+                                    player_rect.width + 10, player_rect.height + 10)
+            
+            pygame.draw.rect(self.screen, (167, 209, 61), player_bg_rect)
+            self.screen.blit(player_surface, player_rect)
+            pygame.draw.rect(self.screen, (56, 74, 12), player_bg_rect, 2)
 
     def draw_grass(self):
         for row in range(self.cell_number):
@@ -763,8 +1050,13 @@ def main():
     
     game = MAIN(screen, cell_size, cell_number, game_font, apple, clock)
     
-    game.main_menu()
+    # Start with name input screen
+    game.name_input_screen()
     
+    # After name input, run the main game loop which will handle the welcome screen
+    main_game_loop(game, screen, clock)
+
+def main_game_loop(game, screen, clock):
     while True:
         mouse_pos = pygame.mouse.get_pos()
         mouse_clicked = False
@@ -773,9 +1065,9 @@ def main():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.type == game.SCREEN_UPDATE and game.game_active and not game.level_complete and not game.game_over_active:
+            if event.type == game.SCREEN_UPDATE and game.game_active and not game.level_complete and not game.game_over_active and not game.showing_welcome:
                 game.update()
-            if event.type == pygame.KEYDOWN and game.game_active and not game.level_complete and not game.game_over_active:
+            if event.type == pygame.KEYDOWN and game.game_active and not game.level_complete and not game.game_over_active and not game.showing_welcome:
                 if event.key == pygame.K_UP and game.snake.direction.y != 1:
                     game.snake.direction = Vector2(0, -1)
                 if event.key == pygame.K_DOWN and game.snake.direction.y != -1:
@@ -793,7 +1085,13 @@ def main():
         
         screen.fill((175, 215, 70))
         
-        if game.game_active:
+        # Handle different game states
+        if game.showing_welcome:
+            game.show_welcome_screen()
+            # If welcome screen is done, transition to main menu
+            if not game.showing_welcome:
+                game.main_menu()
+        elif game.game_active:
             if game.game_over_active:
                 game.show_game_over()
                 
