@@ -1503,7 +1503,7 @@ if __name__ == "__main__":
     pygame.mixer.init() # Initialize mixer for sound
 
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Improved Snake Game")
+    pygame.display.set_caption("Snake Game")
     clock = pygame.time.Clock()
 
     game = Game(screen, clock)
