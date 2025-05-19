@@ -8,7 +8,7 @@ FIXED_SCREEN_WIDTH = 1000  # Total window width (game area + HUD)
 FIXED_SCREEN_HEIGHT = 800 # Total window height
 HUD_WIDTH = 150           # Width of the HUD on the right side
 
-CELL_NUMBER_DEFAULT = 20 # Default, will change with difficulty
+CELL_NUMBER_DEFAULT = 15 # Default, will change with difficulty
 CELL_SIZE_DEFAULT = 30   # Default cell size in pixels
 
 # --- Audio Settings ---
@@ -36,7 +36,7 @@ COLOR_BUTTON_BACK_HOVER = (170, 50, 50)
 COLOR_TEXT_INPUT_INACTIVE = (100, 100, 100)
 COLOR_TEXT_INPUT_ACTIVE = (0, 120, 215)
 COLOR_SCORE_TEXT = (56, 74, 12)
-COLOR_BRIGHT_SCORE_TEXT = (180, 230, 120)  # Even brighter green for HUD text
+COLOR_BRIGHT_SCORE_TEXT = (180, 230, 120)
 COLOR_HUD_BG = (40, 50, 10)
 
 # --- File Paths ---
@@ -59,31 +59,31 @@ DEFAULT_PLAYER_NAME = "Player"
 
 DIFFICULTY_SETTINGS = {
     "Easy": {
-        "base_speed": 250,  # Snake moves slower
-        "obstacle_speed_factor": 1.2, # Obstacles (wall changes) are slower
-        "apple_expiry_enabled": False,
-        "apple_total_life": float('inf'), # Effectively no expiry
+        "base_speed": 250, # Slow speed
+        "obstacle_speed_factor": 1.2, # Slow obstacle speed
+        "apple_expiry_enabled": False, # Disables Apple expiry
+        "apple_total_life": float('inf'), # No expiry
         "apple_warning_time": float('inf'),
-        "poison_apple_life": 5000,  # 5 seconds for poisonous apples
-        "cell_number": 20,
+        "poison_apple_life": 5000,  # 5 seconds before poisonous apples despawn
+        "cell_number": 15,
     },
     "Moderate": {
         "base_speed": 200, # Normal speed
         "obstacle_speed_factor": 1.0, # Normal obstacle speed
-        "apple_expiry_enabled": True,
+        "apple_expiry_enabled": True, # Enables Apple expiry
         "apple_total_life": 15000, # 15 seconds
         "apple_warning_time": 5000,  # Warn 5 seconds before expiry
-        "poison_apple_life": 3500,  # 3.5 seconds for poisonous apples
-        "cell_number": 25,
+        "poison_apple_life": 7500,  # 7.5 seconds befor poisonous apples despawn
+        "cell_number": 20,
     },
     "Hard": {
-        "base_speed": 150, # Snake moves faster
-        "obstacle_speed_factor": 0.8, # Obstacles (wall changes) are faster
-        "apple_expiry_enabled": True,
+        "base_speed": 150, # Fast speed
+        "obstacle_speed_factor": 0.8, # Faster obstacle speed
+        "apple_expiry_enabled": True, # Enables Apple Expiry
         "apple_total_life": 10000, # 10 seconds
         "apple_warning_time": 3000,  # Warn 3 seconds before expiry
-        "poison_apple_life": 2000,  # 2 seconds for poisonous apples
-        "cell_number": 30,
+        "poison_apple_life": 10000,  # 10 seconds for poisonous apples
+        "cell_number": 25,
     }
 }
 DEFAULT_DIFFICULTY = "Moderate"
@@ -135,8 +135,6 @@ class GameState(Enum):
     QUITTING = auto()
 
 # --- Background Tile Definitions for Levels (using world_tileset.png) ---
-# (tile_col, tile_row) from the tileset image. Assumed 16x16 tiles.
-# You might need to adjust these coordinates by inspecting world_tileset.png
 LEVEL_BG_TILES = {
     # Each level can have a primary fill tile and an alternative for checkerboard
     1: {"primary": (0, 0), "secondary": (1, 0), "fill_color": (175, 215, 70)}, # Grass
@@ -145,49 +143,42 @@ LEVEL_BG_TILES = {
     4: {"primary": (8, 0), "secondary": (7, 0), "fill_color": (150, 150, 160)}, # Grey stone
     5: {"primary": (4, 0), "secondary": (5, 0), "fill_color": (160, 190, 220)}, # Blue/Ice
 }
-# Default fill color if tiles are missing or for gaps
+# Default fill color
 DEFAULT_BG_FILL_COLOR = COLOR_DARK_GREEN
 
 # --- Snake Sprite Definitions (from Snake.png) ---
-# These are VERY LIKELY to need adjustment. (x, y, width, height) in Snake.png
-# Assuming a 16px grid for Snake.png and picking the GREEN snake.
-# Example: (col * 16, row * 16, 16, 16)
 SNAKE_SPRITE_SHEET = "Snake.png"
-SNAKE_TILE_SIZE = 16 # Base size of a tile in Snake.png
+SNAKE_TILE_SIZE = 16 
 
-# --- Apple Tile Definitions (from world_tileset.png) ---
-# (tile_col, tile_row)
+# --- Apple Tile Definitions (from Snake.png) ---
 APPLE_TILE_COORDS = {
     "good": pygame.Rect(0 * SNAKE_TILE_SIZE, 21 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),      # Red apple
     "warning": pygame.Rect(2 * SNAKE_TILE_SIZE, 21 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),   # Yellow apple (for expiring)
     "poisonous": pygame.Rect(1 * SNAKE_TILE_SIZE, 21 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Green apple
 }
-POISON_APPLE_CHANCE = 0.15 # 15% chance a new apple is poisonous (if not good/warning)
-APPLE_VISUAL_SCALE_FACTOR = 1.4 # Apples will be drawn 20% larger than cell_size
+POISON_APPLE_CHANCE = 0.1 # 10% chance a new apple is poisonous (if not good/warning)
+APPLE_VISUAL_SCALE_FACTOR = 1.4 # Apples will be drawn 40% larger than cell_size
 
-# Coordinates for GREEN snake parts (approximate, PLEASE VERIFY AND ADJUST)
-# Format: pygame.Rect(x, y, width, height)
-# These might need to be larger than SNAKE_TILE_SIZE if a part spans multiple tiles.
-# For simplicity, assuming single 16x16 tiles for now, scaled up later.
+# --- Snake Tile Definitions (from Snake.png) ---
 SNAKE_GRAPHICS_COORDS = {
     "yellow": {
         "head_up":    pygame.Rect(6 * SNAKE_TILE_SIZE, 3 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
-        "head_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 5 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Might need to rotate head_up or find specific sprite
+        "head_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 5 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
         "head_right": pygame.Rect(6 * SNAKE_TILE_SIZE, 6 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
         "head_left":  pygame.Rect(6 * SNAKE_TILE_SIZE, 4 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
 
-        "tail_up":    pygame.Rect(8 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "tail_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "tail_right": pygame.Rect(7 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "tail_left":  pygame.Rect(9 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
+        "tail_up":    pygame.Rect(8 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
+        "tail_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
+        "tail_right": pygame.Rect(7 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
+        "tail_left":  pygame.Rect(9 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
 
-        "body_vertical": pygame.Rect(0 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "body_horizontal": pygame.Rect(1 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
+        "body_vertical": pygame.Rect(0 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
+        "body_horizontal": pygame.Rect(1 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
 
-        "body_tr": pygame.Rect(2 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Top-Right Turn
-        "body_tl": pygame.Rect(3 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Top-Left Turn (might be body_bl looking)
-        "body_br": pygame.Rect(4 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Bottom-Right Turn
-        "body_bl": pygame.Rect(5 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Bottom-Left Turn
+        "body_tr": pygame.Rect(2 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
+        "body_tl": pygame.Rect(3 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_br": pygame.Rect(4 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_bl": pygame.Rect(5 * SNAKE_TILE_SIZE, 2 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
     },
     "green": {
         "head_up":    pygame.Rect(6 * SNAKE_TILE_SIZE, 10 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
@@ -195,39 +186,39 @@ SNAKE_GRAPHICS_COORDS = {
         "head_right": pygame.Rect(6 * SNAKE_TILE_SIZE, 13 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
         "head_left":  pygame.Rect(6 * SNAKE_TILE_SIZE, 11 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
 
-        "tail_up":    pygame.Rect(8 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "tail_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "tail_right": pygame.Rect(7 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "tail_left":  pygame.Rect(9 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
+        "tail_up":    pygame.Rect(8 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "tail_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "tail_right": pygame.Rect(7 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "tail_left":  pygame.Rect(9 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
 
-        "body_vertical": pygame.Rect(0 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "body_horizontal": pygame.Rect(1 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
+        "body_vertical": pygame.Rect(0 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_horizontal": pygame.Rect(1 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
 
-        "body_tr": pygame.Rect(2 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Top-Right Turn
-        "body_tl": pygame.Rect(3 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Top-Left Turn (might be body_bl looking)
-        "body_br": pygame.Rect(4 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Bottom-Right Turn
-        "body_bl": pygame.Rect(5 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Bottom-Left Turn
+        "body_tr": pygame.Rect(2 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_tl": pygame.Rect(3 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_br": pygame.Rect(4 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_bl": pygame.Rect(5 * SNAKE_TILE_SIZE, 9 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
     },
     "blue": {
         "head_up":    pygame.Rect(6 * SNAKE_TILE_SIZE, 17 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
-        "head_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 19 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Might need to rotate head_up or find specific sprite
+        "head_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 19 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
         "head_right": pygame.Rect(6 * SNAKE_TILE_SIZE, 20 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
         "head_left":  pygame.Rect(6 * SNAKE_TILE_SIZE, 18 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE),
 
-        "tail_up":    pygame.Rect(8 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "tail_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 16* SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "tail_right": pygame.Rect(7 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "tail_left":  pygame.Rect(9 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
+        "tail_up":    pygame.Rect(8 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "tail_down":  pygame.Rect(6 * SNAKE_TILE_SIZE, 16* SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "tail_right": pygame.Rect(7 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "tail_left":  pygame.Rect(9 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
 
-        "body_vertical": pygame.Rect(0 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
-        "body_horizontal": pygame.Rect(1 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Approx
+        "body_vertical": pygame.Rect(0 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_horizontal": pygame.Rect(1 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
 
-        "body_tr": pygame.Rect(2 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Top-Right Turn
-        "body_tl": pygame.Rect(3 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Top-Left Turn (might be body_bl looking)
-        "body_br": pygame.Rect(4 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Bottom-Right Turn
-        "body_bl": pygame.Rect(5 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), # Bottom-Left Turn
+        "body_tr": pygame.Rect(2 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_tl": pygame.Rect(3 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_br": pygame.Rect(4 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
+        "body_bl": pygame.Rect(5 * SNAKE_TILE_SIZE, 16 * SNAKE_TILE_SIZE, SNAKE_TILE_SIZE, SNAKE_TILE_SIZE), 
     }
-    # Add "yellow", "blue" if you want to support other snake colors from the sheet
 }
-SNAKE_COLORS_AVAILABLE = list(SNAKE_GRAPHICS_COORDS.keys()) # Define available colors
+# Define Snake Colors
+SNAKE_COLORS_AVAILABLE = list(SNAKE_GRAPHICS_COORDS.keys())
 DEFAULT_SNAKE_COLOR = "green"

@@ -5,8 +5,8 @@ from PIL import Image, ImageSequence
 from typing import List, Tuple, Optional, Dict, Any
 from config import GRAPHICS_DIR, SOUND_DIR, FONT_DIR, SNAKE_GRAPHICS_COORDS, DEFAULT_SNAKE_COLOR, SNAKE_TILE_SIZE, SNAKE_SPRITE_SHEET, APPLE_TILE_COORDS, CELL_SIZE_DEFAULT
 
-pygame.mixer.pre_init(44100, -16, 2, 512) # Initialize mixer with common parameters
-pygame.init() # Ensure pygame is initialized for font and image loading
+pygame.mixer.pre_init(44100, -16, 2, 512) 
+pygame.init() 
 
 # --- Asset Loading Cache ---
 _image_cache = {}
@@ -49,11 +49,10 @@ class SoundManager:
         self.sounds = {}
         self.music_paused = False
         
-        # Load common sounds
         self.load_common_sounds()
         
     def load_common_sounds(self):
-        # Load sound effects
+        
         self.sounds["crunch"] = load_sound("crunch.wav")
         self.sounds["vomit"] = load_sound("vomit.mp3")
         self.sounds["game_over"] = load_sound("game-over.wav")
@@ -61,17 +60,14 @@ class SoundManager:
         self.sounds["level_finished"] = load_sound("level-finished.wav")
         self.sounds["menu_button"] = load_sound("menu-button.mp3")
         
-        # Set initial volumes
         self.set_volume(self.volume)
     
     def set_volume(self, volume: float):
         """Set volume for all sound effects (0.0 to 1.0)"""
-        self.volume = max(0.0, min(1.0, volume))  # Clamp between 0 and 1
+        self.volume = max(0.0, min(1.0, volume))
         
-        # Set music volume
         pygame.mixer.music.set_volume(self.volume)
         
-        # Set sound effect volumes
         for sound in self.sounds.values():
             sound.set_volume(self.volume)
     
@@ -87,7 +83,7 @@ class SoundManager:
             pygame.mixer.music.load(music_path)
             pygame.mixer.music.set_volume(self.volume)
             if loop:
-                pygame.mixer.music.play(-1)  # -1 means loop indefinitely
+                pygame.mixer.music.play(-1)
             else:
                 pygame.mixer.music.play()
             self.music_loaded = True
@@ -139,12 +135,11 @@ def load_image(filename: str, alpha: bool = True, scale: Optional[Tuple[int, int
         sys.exit()
     except FileNotFoundError:
         print(f"Error: Graphics file not found: {filename}")
-        # Return a placeholder surface or exit
         placeholder = pygame.Surface(scale if scale else (CELL_SIZE_DEFAULT, CELL_SIZE_DEFAULT))
-        placeholder.fill((255,0,0)) # Bright red to indicate missing asset
+        placeholder.fill((255,0,0)) 
         if scale: placeholder = pygame.transform.scale(placeholder, scale)
-        _image_cache[cache_key] = placeholder # Cache placeholder to avoid repeated errors
-        return placeholder # Or sys.exit()
+        _image_cache[cache_key] = placeholder 
+        return placeholder 
 
 def load_font(filename: str, size: int) -> pygame.font.Font:
     """Loads a font file. Uses caching."""
@@ -168,7 +163,6 @@ def load_font(filename: str, size: int) -> pygame.font.Font:
 
 def load_gif_frames(filename: str, scale: Tuple[int, int]) -> List[pygame.Surface]:
     """Loads frames from a GIF, scales them, and converts to Pygame surfaces."""
-    # GIF loading can be memory intensive, consider if caching is needed or if it's loaded once.
     try:
         with Image.open(os.path.join(GRAPHICS_DIR, filename)) as img:
             frames = []
@@ -179,7 +173,7 @@ def load_gif_frames(filename: str, scale: Tuple[int, int]) -> List[pygame.Surfac
                 ).convert_alpha()
                 scaled_frame = pygame.transform.scale(pygame_frame, scale)
                 frames.append(scaled_frame)
-            if not frames: # Handle empty GIF
+            if not frames: 
                  placeholder = pygame.Surface(scale)
                  placeholder.fill((50,50,50))
                  frames.append(placeholder)
@@ -187,7 +181,7 @@ def load_gif_frames(filename: str, scale: Tuple[int, int]) -> List[pygame.Surfac
     except FileNotFoundError:
         print(f"Error: GIF file not found: {filename}")
         placeholder = pygame.Surface(scale)
-        placeholder.fill((50,50,50)) # Grey placeholder
+        placeholder.fill((50,50,50))
         return [placeholder]
     except Exception as e:
         print(f"Error processing GIF {filename}: {e}")
@@ -219,7 +213,7 @@ class Tileset:
         if not (0 <= tile_x < self.cols and 0 <= tile_y < self.rows):
             print(f"Warning: Tile coordinates ({tile_x}, {tile_y}) for {self.filename} out of bounds.")
             placeholder = pygame.Surface(self.scale_to_size)
-            placeholder.fill( (255,0,255) ) # Magenta placeholder for bad tile
+            placeholder.fill( (255,0,255) ) 
             return placeholder
 
         cache_key = (tile_x, tile_y)
@@ -266,16 +260,15 @@ def load_snake_sprites(cell_size: int, snake_color: str = DEFAULT_SNAKE_COLOR) -
         try:
             sprite_image = sheet.subsurface(rect_coords)
             sprites[part_name] = pygame.transform.scale(sprite_image, (cell_size, cell_size))
-        except ValueError as e: # Often from subsurface rect being out of bounds
+        except ValueError as e:
             print(f"Error creating subsurface for snake part '{part_name}' with coords {rect_coords}: {e}")
             print(f"Ensure '{SNAKE_SPRITE_SHEET}' contains this part for color '{snake_color}' at the specified coordinates.")
             print("Using a placeholder for this part.")
             placeholder = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
-            placeholder.fill((0,0,0,0)) # Transparent placeholder
-            pygame.draw.rect(placeholder, (255,0,0), placeholder.get_rect(),1) # Red outline
+            placeholder.fill((0,0,0,0)) 
+            pygame.draw.rect(placeholder, (255,0,0), placeholder.get_rect(),1) 
             sprites[part_name] = placeholder
 
-    # Ensure all standard parts are present, even if as placeholders
     standard_parts = [
         "head_up", "head_down", "head_left", "head_right",
         "tail_up", "tail_down", "tail_left", "tail_right",
@@ -287,7 +280,7 @@ def load_snake_sprites(cell_size: int, snake_color: str = DEFAULT_SNAKE_COLOR) -
             print(f"Warning: Snake part '{part}' for color '{snake_color}' is missing from SNAKE_GRAPHICS_COORDS. Using placeholder.")
             placeholder = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
             placeholder.fill((0,0,0,0))
-            pygame.draw.rect(placeholder, (255,0,255), placeholder.get_rect(),1) # Magenta outline for completely missing
+            pygame.draw.rect(placeholder, (255,0,255), placeholder.get_rect(),1)
             sprites[part] = placeholder
             
     return sprites
@@ -311,21 +304,15 @@ def load_apple_sprites(cell_size: int) -> Dict[str, pygame.Surface]:
 
     for apple_type, rect_coords in APPLE_TILE_COORDS.items():
         try:
-            # Extract the apple sprite from the Snake.png sheet
             sprite_image = sheet.subsurface(rect_coords)
-            # Scale it to cell size
             apple_sprites[apple_type] = pygame.transform.scale(sprite_image, (cell_size, cell_size))
         except ValueError as e:
             print(f"Error creating subsurface for apple '{apple_type}' with coords {rect_coords}: {e}")
             print(f"Ensure '{SNAKE_SPRITE_SHEET}' contains this sprite at the specified coordinates.")
             print("Using a placeholder for this apple type.")
-            # Create a colored placeholder for missing apple sprites
             placeholder = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
             color = {"good": (255,0,0), "warning": (255,255,0), "poisonous": (0,255,0)}.get(apple_type, (128,128,128))
             pygame.draw.circle(placeholder, color, (cell_size//2, cell_size//2), cell_size//2)
             apple_sprites[apple_type] = placeholder
             
     return apple_sprites
-
-# Pre-load common sounds (optional, but can reduce first-play lag)
-# CRUNCH_SOUND = load_sound("crunch.wav")

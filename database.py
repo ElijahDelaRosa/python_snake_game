@@ -3,7 +3,6 @@ import os
 from typing import Optional, List, Dict, Any
 from config import DB_FILE, DATABASE_DIR, LEVEL_CONFIG, DEFAULT_VOLUME, DEFAULT_SNAKE_COLOR, SNAKE_COLORS_AVAILABLE
 
-# Helper to get max levels for bounds checking
 MAX_LEVELS_PER_DIFFICULTY = {
     diff: len(levels) for diff, levels in LEVEL_CONFIG.items()
 }
@@ -31,10 +30,6 @@ class PlayerDatabase:
             return None
 
     def _initialize_db(self):
-        # Drop existing table for schema change (BE CAREFUL WITH THIS IN PRODUCTION)
-        # self._execute("DROP TABLE IF EXISTS players;") 
-        # For development, it's often easier to drop and recreate.
-        # In production, you'd use ALTER TABLE.
 
         create_table_query = f"""
             CREATE TABLE IF NOT EXISTS players (
@@ -55,7 +50,6 @@ class PlayerDatabase:
         self._execute(create_table_query)
         self._execute("CREATE INDEX IF NOT EXISTS idx_player_name ON players (name);")
         
-        # Add new columns if they don't exist (safer for existing dbs)
         self._add_column_if_not_exists("players", "unlocked_easy", "INTEGER DEFAULT 1")
         self._add_column_if_not_exists("players", "unlocked_moderate", "INTEGER DEFAULT 1")
         self._add_column_if_not_exists("players", "unlocked_hard", "INTEGER DEFAULT 1")
@@ -75,8 +69,6 @@ class PlayerDatabase:
         if not name:
             return None
 
-        # Insert player or ignore if name exists, then select their ID.
-        # Default unlocked levels are set by table schema.
         insert_query = "INSERT OR IGNORE INTO players (name) VALUES (?)"
         self._execute(insert_query, (name,))
         
@@ -119,7 +111,7 @@ class PlayerDatabase:
     def get_unlocked_level(self, player_id: int, difficulty: str) -> int:
         """Gets the highest unlocked level for a specific difficulty."""
         if player_id is None or difficulty not in ["Easy", "Moderate", "Hard"]:
-            return 1 # Default to level 1 if invalid input
+            return 1 
         
         column_name = f"unlocked_{difficulty.lower()}"
         query = f"SELECT {column_name} FROM players WHERE id = ?"
@@ -155,7 +147,6 @@ class PlayerDatabase:
         if player_id is None:
             return False
             
-        # Ensure volume is between 0.0 and 1.0
         volume = max(0.0, min(1.0, volume))
         
         update_query = "UPDATE players SET volume = ? WHERE id = ?"

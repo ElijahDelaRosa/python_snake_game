@@ -5,7 +5,7 @@ from typing import List, Tuple, Optional, Dict, Any
 from assets import load_sound, load_snake_sprites, load_apple_sprites, get_tileset, load_image
 from config import (DEFAULT_SNAKE_COLOR, POISON_APPLE_CHANCE,
                     LEVEL_BG_TILES, DEFAULT_BG_FILL_COLOR,
-                    APPLE_VISUAL_SCALE_FACTOR) # Added APPLE_VISUAL_SCALE_FACTOR
+                    APPLE_VISUAL_SCALE_FACTOR)
 
 # Enum for Apple State
 class AppleState:
@@ -18,7 +18,7 @@ class AppleState:
 class Snake:
     def __init__(self, cell_size: int, cell_number: int, initial_pos: Vector2 = Vector2(5,10), color: str = DEFAULT_SNAKE_COLOR):
         self.cell_size = cell_size
-        self.cell_number = cell_number # Keep track of grid size
+        self.cell_number = cell_number 
         self.initial_pos = initial_pos
         self.body: List[Vector2] = []
         self.direction: Vector2 = Vector2(0, 0) # Start stationary
@@ -32,28 +32,23 @@ class Snake:
         self.reset()
 
     def reset(self):
-        # Start with 3 segments: head, body1, body2. Assuming horizontal start, head to the right.
-        # initial_pos is the head. Segments are to its left.
         head_pos = self.initial_pos.copy()
         body1_pos = Vector2(head_pos.x - 1, head_pos.y)
         body2_pos = Vector2(head_pos.x - 2, head_pos.y)
         self.body = [head_pos, body1_pos, body2_pos]
 
         self.direction = Vector2(0, 0) # Start stationary, will be set by GameController
-        self.new_block = False # Ensure this is reset
+        self.new_block = False
         self.update_head_graphics()
-        self.update_tail_graphics() # Also update tail for the initial 3 segments
+        self.update_tail_graphics() 
 
     def draw(self, surface: pygame.Surface):
-        # Draw body segments first (leave out head and tail for now)
         for i, segment in enumerate(self.body):
             x_pos = int(segment.x * self.cell_size)
             y_pos = int(segment.y * self.cell_size)
             rect = pygame.Rect(x_pos, y_pos, self.cell_size, self.cell_size)
 
             if 0 < i < len(self.body) - 1:
-                # For middle segments, determine which body sprite to use based on
-                # the positions of the segments before and after it
                 prev_block = self.body[i + 1] - self.body[i]
                 next_block = self.body[i - 1] - self.body[i]
                 
@@ -84,7 +79,7 @@ class Snake:
         )
         surface.blit(self.head_sprite, head_rect)
 
-        # Draw tail (only if snake has more than one segment)
+        # Draw tail 
         if len(self.body) > 1:
             tail_rect = pygame.Rect(
                 self.body[-1].x * self.cell_size,
@@ -96,7 +91,7 @@ class Snake:
 
     def update_head_graphics(self):
         # Update the head sprite based on current direction
-        if len(self.body) == 1: return # If we only have one segment (the head)
+        if len(self.body) == 1: return 
         
         head_relation = self.body[0] - self.body[1]
         
@@ -107,7 +102,7 @@ class Snake:
 
     def update_tail_graphics(self):
         # Update the tail sprite based on position relative to the second-to-last segment
-        if len(self.body) < 2: return # Cannot determine tail if less than 2 segments
+        if len(self.body) < 2: return
         
         tail_relation = self.body[-2] - self.body[-1]
         
@@ -134,24 +129,19 @@ class Snake:
         self.update_head_graphics()
 
     def grow(self):
-        # Set flag to indicate that a new block should be added on next move
         self.new_block = True
 
     def shrink(self):
-        # Remove the last segment (tail) if snake is longer than 1 segment
         if len(self.body) > 1:
             self.body.pop()
             return True
-        return False  # Cannot shrink further
+        return False  
 
     def change_direction(self, direction: Vector2):
-        # Only change direction if it's not the exact opposite of current direction
-        # This prevents the snake from reversing into itself
         if len(self.body) > 1:
             if direction + self.direction != Vector2(0, 0):
                 self.direction = direction
         else:
-            # If the snake is just a head, it can go any direction
             self.direction = direction
 
     def check_bounds_collision(self) -> bool:
@@ -164,8 +154,6 @@ class Snake:
 
     def check_collision_with_self(self) -> bool:
         """Check if the snake's head collides with its body"""
-        # Skip the first element (the head)
-        # If the head position is in the rest of the body, collision occurred
         head = self.body[0]
         return any(segment == head for segment in self.body[1:])
 
@@ -200,11 +188,6 @@ class Fruit:
 
         # Scale the current apple image (self.image is already cell_size)
         scaled_apple_image = pygame.transform.scale(self.image, (target_width, target_height))
-
-        # Calculate the top-left position to center the scaled image over the original cell
-        # Original cell top-left would be (self.pos.x * self.cell_size, self.pos.y * self.cell_size)
-        # Original cell center_x = self.pos.x * self.cell_size + self.cell_size / 2
-        # Original cell center_y = self.pos.y * self.cell_size + self.cell_size / 2
         
         # Top-left for the new scaled image to be centered at the original cell's center
         draw_x = (self.pos.x * self.cell_size + self.cell_size / 2) - target_width / 2
@@ -239,7 +222,8 @@ class Fruit:
         self.state = new_state
         self.image = self.apple_sprites.get(new_state, self.apple_sprites[AppleState.GOOD])
         if new_state == AppleState.GOOD or new_state == AppleState.POISONOUS:
-            self.spawn_time = pygame.time.get_ticks() # Reset timer when it becomes good or poisonous
+            # Reset timer when it becomes good or poisonous
+            self.spawn_time = pygame.time.get_ticks() 
 
     def randomize(self, snake_body: List[Vector2], wall_positions: List[Vector2], other_apple_pos: List[Vector2]):
         occupied_positions = snake_body + wall_positions + other_apple_pos
@@ -262,8 +246,7 @@ class Fruit:
         if random.random() < POISON_APPLE_CHANCE:
             self.set_state(AppleState.POISONOUS)
         else:
-            self.set_state(AppleState.GOOD) # Resets spawn_time
-
+            self.set_state(AppleState.GOOD) 
 
 class Wall:
     def __init__(self, cell_size: int, cell_number: int):
@@ -271,7 +254,6 @@ class Wall:
         self.cell_number = cell_number
         self.positions: List[Vector2] = []
         
-        # Use Snake.png instead of world_tileset.png
         self.snake_tileset = get_tileset("Snake.png", 16, 16, cell_size)
         
         # Store obstacle tile coordinates from Snake.png
@@ -301,10 +283,8 @@ class Wall:
             scaled_tile = pygame.transform.scale(tile, (new_width, new_height))
             self.tile_images.append(scaled_tile)
         
-        # Dictionary to map each position to a specific tile index (using string keys)
         self.position_to_tile = {}
     
-    # Helper to convert Vector2 to a string key
     def _pos_to_key(self, pos: Vector2) -> str:
         return f"{int(pos.x)},{int(pos.y)}"
 
@@ -375,7 +355,7 @@ class Background:
         self.fill_color = DEFAULT_BG_FILL_COLOR
 
     def set_level_background(self, level_number: int):
-        level_bg_data = LEVEL_BG_TILES.get(level_number, LEVEL_BG_TILES.get(1)) # Default to level 1 style
+        level_bg_data = LEVEL_BG_TILES.get(level_number, LEVEL_BG_TILES.get(1)) 
         if level_bg_data:
             primary_coord = level_bg_data["primary"]
             secondary_coord = level_bg_data["secondary"]
@@ -385,7 +365,7 @@ class Background:
             }
             self.fill_color = level_bg_data.get("fill_color", DEFAULT_BG_FILL_COLOR)
         else:
-            self.current_level_tiles = None # Fallback to solid color
+            self.current_level_tiles = None 
             self.fill_color = DEFAULT_BG_FILL_COLOR
 
 
@@ -399,10 +379,5 @@ class Background:
                     tile_image = tile1 if (row + col) % 2 == 0 else tile2
                     screen.blit(tile_image, bg_rect)
         else:
-            # Fallback: fill with a color that complements or a default
-            # screen.fill(self.fill_color) # This fills the whole screen. We need to draw this first.
-            # This draw method is for the game area, main.py or game_controller should handle overall screen fill
-            
-            # If drawing a specific game area background:
             game_area_rect = pygame.Rect(0, 0, self.cell_number * self.cell_size, self.cell_number * self.cell_size) # Assuming game area starts at 0,0
             pygame.draw.rect(screen, self.fill_color, game_area_rect)

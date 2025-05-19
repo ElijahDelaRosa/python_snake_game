@@ -1,6 +1,6 @@
 import pygame
 import sys
-import time # For state transition delays, though pygame.time.get_ticks() is mostly used
+import time
 from pygame.math import Vector2
 from typing import List, Tuple, Optional, Dict, Any
 
@@ -17,32 +17,28 @@ from assets import (
 )
 from database import PlayerDatabase
 from ui_elements import TextInput, Button, Slider
-from game_objects import Snake, Fruit, Wall, Background, AppleState # AppleState for clarity
+from game_objects import Snake, Fruit, Wall, Background, AppleState 
 from level_manager import LevelManager
 
 
 class GameController:
     def __init__(self):
+        # Initialize Difficulty
         self.difficulty = DEFAULT_DIFFICULTY
         self.current_difficulty_settings = DIFFICULTY_SETTINGS[self.difficulty]
-        self.selected_difficulty_for_level_select = None # Added for level selection
-        # self.cell_number is set in _setup_game_instance based on difficulty
+        self.selected_difficulty_for_level_select = None 
 
-        # Initialize screen dimensions (fixed)
+        # Initialize screen dimensions
         self.screen_width = FIXED_SCREEN_WIDTH
         self.screen_height = FIXED_SCREEN_HEIGHT
         self.game_area_width = self.screen_width - HUD_WIDTH
         self.game_area_height = self.screen_height
 
-        # self.cell_size will be calculated in _setup_game_instance
-        # self.game_surface_width and self.game_surface_height also in _setup_game_instance
-        # self.game_area_offset_x and self.game_area_offset_y also in _setup_game_instance
-
         # Initialize pygame screen
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Snake Game")
 
-        # Define HUD rectangle (game_area_rect will be defined after cell_size is known)
+        # Define HUD rectangle
         self.hud_area_rect = pygame.Rect(
             self.game_area_width,
             0,
@@ -58,15 +54,15 @@ class GameController:
         self.player_name = DEFAULT_PLAYER_NAME
         self.player_id = None
         self.volume = DEFAULT_VOLUME
-        self.snake_color = DEFAULT_SNAKE_COLOR # Added snake_color attribute
-        self.selected_color_index_name_input = SNAKE_COLORS_AVAILABLE.index(DEFAULT_SNAKE_COLOR) # For name input UI
+        self.snake_color = DEFAULT_SNAKE_COLOR 
+        self.selected_color_index_name_input = SNAKE_COLORS_AVAILABLE.index(DEFAULT_SNAKE_COLOR)
 
         # Initialize timers that might be accessed by setup/reset methods
         self.last_wall_change_time = 0
-        self.last_apple_spawn_time = {} # Initialize an empty dictionary
+        self.last_apple_spawn_time = {}
         self.state_transition_time = 0
-        self.welcome_duration = 2000  # ms
-        self.level_transition_duration = 1500 # ms
+        self.welcome_duration = 2000  # 2 seconds
+        self.level_transition_duration = 1500 # 1.5 seconds
 
         # Initialize SCREEN_UPDATE event type *before* _setup_game_instance is called,
         # because _setup_game_instance calls _update_game_timer which uses it.
@@ -76,9 +72,9 @@ class GameController:
         try:
             self.hud_font = load_font("dpcomic.ttf", 30)
             self.title_font = load_font("dpcomic.ttf", 50)
-            self.score_font = load_font("dpcomic.ttf", 25) # Needed by _setup_game_instance for apple_score_icon
+            self.score_font = load_font("dpcomic.ttf", 25)
             self.small_font = load_font("dpcomic.ttf", 18)
-            self.ui_font = load_font("dpcomic.ttf", 35)    # For UI elements
+            self.ui_font = load_font("dpcomic.ttf", 35)
         except Exception as e:
             print(f"Error loading fonts: {e}")
             self.hud_font = pygame.font.SysFont("arial", 24)
@@ -110,8 +106,6 @@ class GameController:
         # Start background music
         sound_manager.play_music()
 
-        # Note: self._update_game_timer() is now called at the end of _setup_game_instance()
-
     def _calculate_dynamic_dimensions(self):
         """
         Calculates cell_size, game surface dimensions, and game area offsets
@@ -121,12 +115,11 @@ class GameController:
         """
         if not isinstance(self.cell_number, int) or self.cell_number <= 0:
             print(f"Warning: Invalid cell_number ({self.cell_number}). Defaulting to 20.")
-            self.cell_number = 20 # Fallback to a sensible default
+            self.cell_number = 20 
 
-        # Prevent division by zero if game_area_width/height is zero for some reason
         if self.game_area_width <= 0 or self.game_area_height <= 0:
             print(f"Warning: game_area_width ({self.game_area_width}) or game_area_height ({self.game_area_height}) is non-positive. Cannot calculate cell_size.")
-            self.cell_size = 10 # Arbitrary fallback
+            self.cell_size = 10 
             self.game_surface_width = self.cell_number * self.cell_size
             self.game_surface_height = self.cell_number * self.cell_size
             self.game_area_offset_x = 0
@@ -154,7 +147,6 @@ class GameController:
             self.game_surface_width,
             self.game_surface_height
         )
-        # print(f"Dynamic dimensions calculated: cell_number={self.cell_number}, cell_size={self.cell_size}")
 
     def _setup_game_instance(self):
         """Initializes or re-initializes game objects based on current difficulty."""
@@ -190,35 +182,35 @@ class GameController:
         center_y = self.screen_height // 2
         button_width = 250
         button_height = 60
-        button_spacing = 20  # Define button_spacing
-        back_button_size = (120, 50) # Define back_button_size
+        button_spacing = 20  
+        back_button_size = (120, 50) 
         input_field_height = 50
-        small_button_width = 120 # For color cycling
-        text_label_y_offset = 40 # Offset for "Color:" label
-        color_selector_y_offset = text_label_y_offset + 35 # Offset for color buttons/text
+        small_button_width = 120 
+        text_label_y_offset = 40 
+        color_selector_y_offset = text_label_y_offset + 35 
 
         # Name input elements
         self.name_input = TextInput(
-            center_x - 150, center_y - input_field_height - 50, # Moved up
+            center_x - 150, center_y - input_field_height - 50, 
             300, input_field_height, self.ui_font
         )
 
         # Snake Color Selection UI for Name Input
         self.prev_color_button_name_input = Button(
-            center_x - small_button_width - 70, # Positioned to the left of color display
+            center_x - small_button_width - 70, 
             center_y + color_selector_y_offset - 50,
             small_button_width, button_height - 10, "<", self.ui_font,
             action=lambda: self._cycle_snake_color_name_input(-1)
         )
         self.next_color_button_name_input = Button(
-            center_x + 70, # Positioned to the right of color display
+            center_x + 70, 
             center_y + color_selector_y_offset - 50,
             small_button_width, button_height - 10, ">", self.ui_font,
             action=lambda: self._cycle_snake_color_name_input(1)
         )
 
         self.name_confirm_button = Button(
-            center_x - 100, center_y + button_height + color_selector_y_offset - 30, # Moved down
+            center_x - 100, center_y + button_height + color_selector_y_offset - 30, 
             200, 50, "Confirm", self.ui_font,
             action=lambda: self._handle_name_confirmation()
         )
@@ -286,7 +278,7 @@ class GameController:
 
         self.level_select_back_button = Button(
             50, self.screen_height - 70,
-            back_button_size[0], back_button_size[1], "Back", self.ui_font, # Use back_button_size
+            back_button_size[0], back_button_size[1], "Back", self.ui_font, 
             color=COLOR_BUTTON_BACK_NORMAL, hover_color=COLOR_BUTTON_BACK_HOVER,
             action=lambda: self._change_state(GameState.MAIN_MENU)
         )
@@ -343,14 +335,14 @@ class GameController:
         color_button_width_small = 100
         color_button_height_small = 40
         num_colors = len(SNAKE_COLORS_AVAILABLE)
-        total_color_button_width = num_colors * color_button_width_small + (num_colors - 1) * 10 # 10px spacing
+        total_color_button_width = num_colors * color_button_width_small + (num_colors - 1) * 10 
         start_x_color_buttons = center_x - total_color_button_width // 2
 
         for i, color_name in enumerate(SNAKE_COLORS_AVAILABLE):
             button_x = start_x_color_buttons + i * (color_button_width_small + 10)
             btn = Button(
                 button_x, color_button_y_start,
-                color_button_width_small, color_button_height_small, color_name.capitalize(), self.small_font, # Using small_font
+                color_button_width_small, color_button_height_small, color_name.capitalize(), self.small_font, 
                 action=lambda c=color_name: self._select_snake_color(c)
             )
             self.options_color_buttons[color_name] = btn
@@ -406,7 +398,7 @@ class GameController:
         # Special state handling
         if new_state == GameState.PLAYING:
             if self.snake: 
-                self.snake.direction = Vector2(1, 0) # Start moving
+                self.snake.direction = Vector2(1, 0) 
             self.last_wall_change_time = pygame.time.get_ticks()
             
         elif new_state == GameState.MAIN_MENU:
@@ -438,37 +430,30 @@ class GameController:
             self.background.set_level_background(self.level_manager.get_level_number())
 
         self.last_wall_change_time = pygame.time.get_ticks()
-        if self.snake: self.snake.direction = Vector2(0,0) # Will be set to (1,0) when PLAYING state entered
+        if self.snake: self.snake.direction = Vector2(0,0)
 
     def _full_game_reset(self, reset_player_too=False, keep_current_level_index=False):
         """Resets the entire game state for a new game (e.g., after game over and play again)."""
-        # Remember the current level index if we need to preserve it
         current_level_idx = self.level_manager.current_level_index if keep_current_level_index else 0
         
         if not keep_current_level_index:
-            self.level_manager.reset_progress() # Reset to level 1 (index 0) of the current difficulty
+            self.level_manager.reset_progress() 
         
-        # Ensure difficulty in level_manager matches the game controller's current difficulty for this reset
-        self.level_manager.set_difficulty(self.difficulty) # This will reset current_level_index to 0
+        self.level_manager.set_difficulty(self.difficulty) 
         
-        # Restore the level index if needed
         if keep_current_level_index:
             self.level_manager.current_level_index = current_level_idx
             
         self.current_difficulty_settings = DIFFICULTY_SETTINGS[self.difficulty]
         
-        # _setup_game_instance re-initializes snake, walls, apples, bg, score, and calls _reset_level_state.
-        # _reset_level_state will use the level_manager.current_level_index (which is now correctly set or preserved).
         self._setup_game_instance() 
-        # self.score = 0 # score is already reset within _setup_game_instance -> _reset_level_state or directly in _setup_game_instance
 
         if reset_player_too:
             self.player_name = DEFAULT_PLAYER_NAME
             self.player_id = None
-            self._change_state(GameState.NAME_INPUT) # Go back to name input
+            self._change_state(GameState.NAME_INPUT) 
         else:
-            # If not resetting player, but difficulty might have changed.
-             self._update_game_timer() # Update speed if difficulty changed
+             self._update_game_timer() 
 
 
     def _play_again(self):
@@ -484,31 +469,26 @@ class GameController:
             if self.background: self.background.set_level_background(self.level_manager.get_level_number())
             self._change_state(GameState.PLAYING)
         else: 
-            if self.player_id is not None: # Game completed for this difficulty
+            if self.player_id is not None: 
                 self.player_db.unlock_next_level(self.player_id, self.difficulty, completed_level_number) # Unlock final level if structure allows
             self._trigger_game_completed()
 
     def _select_difficulty(self, difficulty: str):
         """Set the difficulty without changing the state - just update UI and settings"""
-        # Update settings instead of redirecting to level selection
         self.difficulty = difficulty
         self.current_difficulty_settings = DIFFICULTY_SETTINGS[difficulty]
         
-        # Update button colors to show the selected difficulty
         for diff, button in self.difficulty_buttons.items():
             if diff == self.difficulty:
                 button.color = (30, 100, 30)  # Highlight selected difficulty
             else:
                 button.color = COLOR_BUTTON_NORMAL
         
-        # Update the game timer to reflect new difficulty
         self._update_game_timer()
         
-        # Store difficulty preference in database if player exists
         if self.player_id:
             self.player_db.update_player_difficulty(self.player_id, difficulty)
             
-        # Play feedback sound
         sound_manager.play_sound("menu_button")
 
     def _start_level(self, level_index: int):
@@ -545,17 +525,17 @@ class GameController:
             self._draw_current_state(current_time)
 
             pygame.display.flip()
-            self.clock.tick(60) # Target 60 FPS for animations, game logic tied to SCREEN_UPDATE timer
+            self.clock.tick(60) 
 
         pygame.quit()
         sys.exit()
 
     def _handle_current_state_events(self, event):
-        # Universal key presses (like ESC for pause if in PLAYING)
+        # Universal key presses
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE and self.game_state == GameState.PLAYING:
                 self._change_state(GameState.PAUSED)
-                return # Consume event
+                return 
 
         # State-specific event handling
         if self.game_state == GameState.NAME_INPUT:
@@ -600,7 +580,6 @@ class GameController:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 for color_name, button in self.options_color_buttons.items():
                     if button.handle_event(event):
-                        # _select_snake_color will play sound and update DB
                         return
             if self.options_back_button.handle_event(event): 
                 sound_manager.play_sound("menu_button")
@@ -616,14 +595,13 @@ class GameController:
                 sound_manager.play_sound("menu_button")
                 return
         elif self.game_state == GameState.LEVEL_SELECT:
-            # Handle level selection buttons using current_buttons
             if hasattr(self, 'current_buttons'):
                 for button in self.current_buttons:
                     if button and hasattr(button, 'handle_event') and button.handle_event(event):
                         sound_manager.play_sound("menu_button")
                         return
         elif self.game_state == GameState.PLAYING:
-            self._handle_playing_events(event) # This one is different, handles key presses and SCREEN_UPDATE
+            self._handle_playing_events(event) 
         elif self.game_state == GameState.PAUSED:
             if self.resume_button.handle_event(event): 
                 sound_manager.play_sound("menu_button")
@@ -643,7 +621,7 @@ class GameController:
             if self.retry_button.handle_event(event): 
                 sound_manager.play_sound("menu_button")
                 return
-            if self.game_over_main_menu_button.handle_event(event): # Corrected button
+            if self.game_over_main_menu_button.handle_event(event): 
                 sound_manager.play_sound("menu_button")
                 return
 
@@ -657,8 +635,6 @@ class GameController:
             if current_time - self.state_transition_time > self.welcome_duration:
                 self._change_state(GameState.MAIN_MENU)
         elif self.game_state == GameState.PLAYING:
-            # Game logic updates are tied to SCREEN_UPDATE event in _handle_playing_events
-            # But apple state updates (visual expiry) can happen per frame
             for apple in self.apples:
                 if apple.is_active:
                     apple.update_state(current_time)
@@ -692,7 +668,7 @@ class GameController:
                 button.check_hover(mouse_pos)
             self.volume_slider.check_hover(mouse_pos)
             self.change_name_button.check_hover(mouse_pos)
-            for button in self.options_color_buttons.values(): # Add hover for color buttons
+            for button in self.options_color_buttons.values():
                 button.check_hover(mouse_pos)
             self.options_back_button.check_hover(mouse_pos)
         elif self.game_state == GameState.CHANGE_NAME:
@@ -700,7 +676,7 @@ class GameController:
             self.submit_new_name_button.check_hover(mouse_pos)
             self.cancel_name_change_button.check_hover(mouse_pos)
         elif self.game_state == GameState.LEVEL_SELECT:
-            # Update hover for all active buttons (stored in current_buttons)
+            # Update hover for all active buttons
             if hasattr(self, 'current_buttons'):
                 for button in self.current_buttons:
                     if button and hasattr(button, 'check_hover'):
@@ -775,7 +751,7 @@ class GameController:
         color_text_rect = color_text_surf.get_rect(center=(self.screen_width // 2, self.prev_color_button_name_input.rect.centery))
         self.screen.blit(color_text_surf, color_text_rect)
         
-        self.name_confirm_button.draw(self.screen) # Adjusted Y implicitly by its definition
+        self.name_confirm_button.draw(self.screen)
 
     def _draw_welcome_state(self):
         self._draw_overlay_message(f"Welcome, {self.player_name}!", title_font=self.title_font, y_offset_factor=0.5)
@@ -787,7 +763,7 @@ class GameController:
         
     def _draw_options_menu(self):
         """Draw options menu"""
-        # First, draw menu animation or background
+        # Draw menu animation or background
         if hasattr(self, 'main_menu_frames') and self.main_menu_frames:
             self.screen.blit(self.main_menu_frames[self.current_menu_frame_index], (0, 0))
         else:
@@ -932,14 +908,14 @@ class GameController:
         self._draw_score_hud()
 
     def _draw_paused_state(self):
-        self._draw_playing_state() # Draw game underneath
+        self._draw_playing_state() 
         self._draw_overlay_message("PAUSED", title_font=self.title_font, y_offset_factor=0.3)
         self.resume_button.draw(self.screen)
         self.paused_main_menu_button.draw(self.screen)
 
 
     def _draw_level_transition_state(self, current_time: int):
-        self._draw_playing_state() # Draw semi-transparent game underneath
+        self._draw_playing_state()
         title = f"Level {self.level_manager.get_level_number() -1} Complete!" if self.level_manager.current_level_index > 0 else "Get Ready!"
         self._draw_overlay_message(title, title_font=self.title_font, y_offset_factor=0.3)
         
@@ -950,7 +926,7 @@ class GameController:
 
         if current_time - self.state_transition_time > self.level_transition_duration:
             self.next_level_button.draw(self.screen)
-            self.main_menu_return_button.draw(self.screen) # Positioned by _initialize_ui_elements
+            self.main_menu_return_button.draw(self.screen)
             self.current_buttons = [self.next_level_button, self.main_menu_return_button]
 
 
@@ -1016,7 +992,7 @@ class GameController:
 
     def _draw_overlay_message(self, message: str, color: Tuple[int,int,int] = COLOR_WHITE, title_font=None, y_offset_factor=0.5):
         overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 180)) # Dark semi-transparent overlay
+        overlay.fill((0, 0, 0, 180))
         self.screen.blit(overlay, (0,0))
         
         font_to_use = title_font if title_font else self.ui_font
@@ -1031,11 +1007,10 @@ class GameController:
             self.player_id = self.player_db.add_player(name)
             if self.player_id is not None:
                 self._change_state(GameState.WELCOME)
-            else: # DB error or some other issue
-                self.player_name = DEFAULT_PLAYER_NAME # Fallback
+            else: 
+                self.player_name = DEFAULT_PLAYER_NAME 
                 self.player_id = None
-                self._change_state(GameState.MAIN_MENU) # Skip welcome
-        # else: stay on name input if empty
+                self._change_state(GameState.MAIN_MENU) 
 
     def _go_to_change_name(self):
         """Navigate to the name change screen"""
@@ -1084,9 +1059,7 @@ class GameController:
                 sound_manager.play_sound("menu_button")
                 self._change_state(GameState.OPTIONS_MENU)
             else:
-                # Name might be taken or there was a DB error
                 print(f"Failed to change name to {new_name}. It might be taken.")
-                # Could show error message on screen
         else:
             # No change needed or empty name
             self._change_state(GameState.OPTIONS_MENU)
@@ -1127,12 +1100,12 @@ class GameController:
                 if apple.state == AppleState.POISONOUS:
                     # Play vomit sound and shrink the snake
                     sound_manager.play_sound("vomit")
-                    self.snake.shrink()  # Using new shrink method
-                    self.score = max(0, self.score - 1)  # Reduce score but not below 0
+                    self.snake.shrink()
+                    self.score = max(0, self.score - 1)  
                 else:
                     # Play crunch sound and grow the snake
                     sound_manager.play_sound("crunch")
-                    self.snake.grow()  # Using new grow method
+                    self.snake.grow()
                     self.score += 1
                 
                 self._handle_apple_despawn(apple, eaten=True)
@@ -1209,9 +1182,7 @@ class GameController:
             # Check if an apple for this slot exists and is active
             slot_filled = False
             for apple in self.apples:
-                # A simple way to associate an apple with a "slot" is just by count
-                # This part can be more complex if apples need unique IDs tied to slots
-                pass # For now, just check if we have enough active apples
+                pass 
 
             if current_apple_count < num_apples_for_level:
                  # Try to find an inactive apple to reactivate or add a new one if list is too short
@@ -1251,11 +1222,7 @@ class GameController:
         apple_to_remove.pos = Vector2(-1,-1) # Move off screen
 
         # Logic to respawn an apple after a delay
-        # For simplicity, we'll just call _ensure_apple_count which will try to fill slots.
-        # A more robust system might use a timer per apple "slot".
-        pygame.time.set_timer(pygame.USEREVENT + 2 + self.apples.index(apple_to_remove), self.level_manager.get_apple_spawn_delay(), True) # One-shot timer
-        # The event for this timer should trigger _ensure_apple_count or a specific respawn for that slot.
-        # For now, _ensure_apple_count will be called periodically or after an apple is gone.
+        pygame.time.set_timer(pygame.USEREVENT + 2 + self.apples.index(apple_to_remove), self.level_manager.get_apple_spawn_delay(), True)
         self._ensure_apple_count()
 
 
@@ -1272,7 +1239,7 @@ class GameController:
         print("Game Completed (difficulty) triggered!")
         if self.player_id is not None:
             self.player_db.update_player_score(
-                self.player_id, self.score, self.difficulty, self.level_manager.get_level_number() # Final level
+                self.player_id, self.score, self.difficulty, self.level_manager.get_level_number() 
             )
         self._change_state(GameState.GAME_COMPLETED)
 
