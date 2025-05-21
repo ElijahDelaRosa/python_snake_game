@@ -409,6 +409,10 @@ class GameController:
         elif new_state == GameState.CHANGE_NAME:
             current_name = self.player_db.get_player_data(self.player_id)["name"] if self.player_id else ""
             self.new_name_input.set_text(current_name)
+        elif new_state == GameState.LEVEL_SELECT:
+            if self.selected_difficulty_for_level_select and \
+               self.selected_difficulty_for_level_select in self.level_buttons:
+                del self.level_buttons[self.selected_difficulty_for_level_select]
 
 
     def _reset_level_state(self):
